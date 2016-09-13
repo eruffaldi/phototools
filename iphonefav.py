@@ -2,8 +2,7 @@ import sqlite3
 import argparse
 import os
 import shutil
-import imghdr
-import exifread
+import touchexif
 
 
 
@@ -37,5 +36,7 @@ if __name__ == '__main__':
 				tp = os.path.join(args.target,f)
 				if not os.path.isfile(tp) or args.overwrite:
 					shutil.copyfile(found,tp)
+				if os.path.isfile(tp) and args.fixtime:
+					touchexif.touch(tp)
 		else:
 			print "NO",f

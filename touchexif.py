@@ -73,7 +73,12 @@ def backquote(cmd,noErrorCode=(0,),output=subprocess.PIPE,errout=subprocess.PIPE
     if comm[0]:
         return comm[0] #.rstrip().split('\n')
 
-def touch(fname, x):
+def touch(fname, x=None):
+	if x is None:
+		te,tf = findfiletime(fname)
+		if te is None or te == tf:
+			return False
+		x = te
 	if isinstance(x,datetime):
 		x = time.mktime(x.timetuple())
 	os.utime(fname, (x,x))
@@ -82,6 +87,28 @@ def vtouch(fname,x):
 		fname = "\"%s\"" % fname
 	#touch [-A [-][[hh]mm]SS] [-acfhm] [-r file] [-t [[CC]YY]MMDDhhmm[.SS]] file ...
 	print "touch -t %s %s" % (x.strftime("%Y%m%d%H%M.%S"),fname)
+
+def findfiletime(fp):
+	s = os.stat(fp)
+	size = s.st_size
+	t = s.st_mtime
+	e = os.path.split(fp)[1]
+	te = None
+	tf = datetime.fromtimestamp(s.st_mtime)
+	if e.lower() == ".mov":
+		te = json.loads(backquote(["exiftool", "-CreateDate","-j",fp]))
+		t = te[0]["CreateDate"]
+		te = datetime.strptime(str(t),"%Y:%m:%d %H:%M:%S")
+		#exiftool Pictures/Leonardo/LeoiPhoneEli/IMG_1696.MOV -CreateDate -j
+	else:
+		tags = getexif(fp)
+		if tags is not None:
+			t = tags.get("Image DateTime")
+			if t is None:
+				te = None
+			else:
+				te = datetime.strptime(str(t),"%Y:%m:%d %H:%M:%S")
+	return te,tf
 class Scanner:
 	def __init__(self,args):
 		self.args = args
@@ -98,29 +125,8 @@ class Scanner:
 				pass
 				#self.scan(fp,bfp)
 			elif p[0] != "." and e.lower()[1:] in self.allowedext:
-				s = os.stat(fp)
-				size = s.st_size
-				t = s.st_mtime
-				tf = datetime.fromtimestamp(s.st_mtime)
-				if e.lower() == ".mov":
-					te = json.loads(backquote(["exiftool", "-CreateDate","-j",fp]))
-					t = te[0]["CreateDate"]
-					te = datetime.strptime(str(t),"%Y:%m:%d %H:%M:%S")
-					if args.verbose:
-						print "#need fix",p,tf,"->",te
-					if args.test:
-						vtouch(fp,te)
-					else:
-						touch(fp,te)
-					#exiftool Pictures/Leonardo/LeoiPhoneEli/IMG_1696.MOV -CreateDate -j
-				else:
-					tags = getexif(fp)
-					t = tags.get("Image DateTime")
-					if t is None:
-						print "#missing Image DateTime in ",p
-						continue
-					te = datetime.strptime(str(t),"%Y:%m:%d %H:%M:%S")
-				if te != tf:
+				te,tf = findfiletime(fp)
+				if te is not None and te != tf:
 					if args.verbose:
 						print "#need fix",p,tf,"->",te
 					if args.test:
