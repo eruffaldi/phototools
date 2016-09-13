@@ -2,7 +2,9 @@ import sqlite3
 import argparse
 import os
 import shutil
+import datetime
 import touchexif
+
 
 
 
@@ -20,11 +22,12 @@ if __name__ == '__main__':
 		os.mkdir(args.target)
 	print "paths:",args.path
 	print "db:",args.db
-	conn = sqlite3.connect(args.db)
+	conn = sqlite3.connect(args.db)#detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
 	c = conn.cursor()
-	files = [x[0] for x in c.execute("select zfilename from zgenericasset where zfavorite=1;")]
+	files = [x for x in c.execute("select zfilename,ZADDEDDATE from zgenericasset where zfavorite=1;")]
 	print files
-	for f in files:
+	for f,t in files:
+		t = datetime.datetime.fromtimestamp(t+978307200)
 		found = None
 		for p in args.path:
 			if os.path.isfile(os.path.join(p,f)):
@@ -37,6 +40,6 @@ if __name__ == '__main__':
 				if not os.path.isfile(tp) or args.overwrite:
 					shutil.copyfile(found,tp)
 				if os.path.isfile(tp) and args.fixtime:
-					touchexif.touch(tp)
+					touchexif.touch(tp,t)
 		else:
 			print "NO",f
